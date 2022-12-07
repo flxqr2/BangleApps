@@ -1,25 +1,3 @@
-/*
-
-files on bangle
-
-- albums.json.data
-[
-	{
-		id: "uid",
-		name: "xyz",
-		images: [
-			name: "xyz",
-			offset: 0,
-			length: 23456
-		],
-	}
-]
-
-- albums.data
--> compressed image strings
-
-*/
-
 const { useRef, useState, useMemo, useEffect, useCallback, memo } = React;
 
 const uid = () => {
@@ -325,11 +303,9 @@ const ListEntry = ({ file, onAddToAlbum, removeImage }) => {
 };
 
 const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
-  const [isLoading, setLoading] = useState(false);
   const [storageStats, setStorageStats] = useState();
 
   const { jsonFile, dataFile } = useMemo(() => {
-    console.log('albums', albums);
     let dataStr = '';
     const jsonData = albums.map((album) => {
       return {
@@ -360,14 +336,12 @@ const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
           <button
             className="float-right"
             onClick={() => {
-              setLoading(true);
               UART.eval(
                 'require("Storage").readJSON("albums.json.data")',
                 (albums) => {
                   UART.eval(
                     'require("Storage").read("albums.data")',
                     (data) => {
-                      console.log(albums, data);
                       if (data) {
                         setAlbums(
                           albums.map((album) => {
@@ -387,7 +361,6 @@ const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
                       }
                       UART.eval('require("Storage").getStats()', (data) => {
                         setStorageStats(data);
-                        setLoading(false);
                       });
                     }
                   );
@@ -423,7 +396,6 @@ const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
       <button
         style={{ marginLeft: 'auto', display: 'block' }}
         onClick={() => {
-          setLoading(true);
           UART.eval(
             `require("Storage").write("albums.json.data",'${jsonFile}');`,
             (data) => {
@@ -445,16 +417,6 @@ const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
 };
 
 const AlbumImage = ({ data, name, removeFromAlbum, ...props }) => {
-  const [img, setImg] = useState();
-  useEffect(() => {
-    return;
-    console.log(imageconverter.stringToImageURL(atob(data)));
-    UART.eval(
-      `require('heatshrink').decompress(atob('${data}'))
-	`,
-      (data) => console.log(data)
-    );
-  }, [data]);
   return (
     <div className="row">
       <p>{name}</p>
@@ -491,7 +453,6 @@ const Album = ({ setAlbums, removeFromAlbum, id, name, images }) => {
     }
   }, [id, ref, name]);
 
-  console.log('images', images);
   return (
     <section className="container">
       <label htmlFor="input_name">Name</label>
@@ -524,7 +485,6 @@ const Main = () => {
   const [albums, setAlbums] = useState([]);
   const [currentAlbum, setCurrentAlbum] = useState();
 
-  console.log(images, currentAlbum);
   const addImage = useCallback(
     (image) => {
       setImages((images) => [
@@ -642,4 +602,3 @@ const Main = () => {
 const domContainer = document.querySelector('#root');
 const root = ReactDOM.createRoot(domContainer);
 root.render(<Main />);
-console.log('here');
