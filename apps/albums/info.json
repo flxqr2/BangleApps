@@ -1,0 +1,10 @@
+{
+  "id": "fruits",
+  "name": "Fruit images",
+  "type": "app",
+  "src": "fruits.app.js",
+  "icon": "fruits.img",
+  "version": "0.01",
+  "tags": "fruits, flx",
+  "files": "fruits.info,fruits.app.js,fruits.img"
+}
