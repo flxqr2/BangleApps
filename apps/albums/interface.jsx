@@ -1,11 +1,65 @@
 const { useRef, useState, useMemo, useEffect, useCallback, memo } = React;
 
+const bpps = {
+  1: '1bit',
+  2: '2bitbw',
+  3: '3bit',
+  4: '4bitmac',
+  8: 'web',
+  16: 'rgb565',
+};
+
+const diffusions = {
+  none: 'Nearest color (flat)',
+  random1: 'Random small',
+  random2: 'Random large',
+  error: 'Error Diffusion',
+  errorrandom: 'Randomised Error Diffusion',
+  bayer2: '2x2 Bayer',
+  bayer4: '4x4 Bayer',
+};
+
 const uid = () => {
   const ff = (s) => {
     const pt = (Math.random().toString(16) + '000000000').substr(2, 8);
     return s ? '-' + pt.substr(0, 4) + '-' + pt.substr(4, 4) : pt;
   };
   return ff() + ff(true) + ff(true) + ff();
+};
+
+const ViewOnBangleButton = memo(({ data, ...props }) => {
+  const onClick = useCallback(() => {
+    UART.eval('load(null)', () => {});
+    UART.eval(
+      `g.setColor(0x000000).setBgColor(0xFFFFFF).clear().drawImage(require("heatshrink").decompress(atob("${data}")));`,
+      () => {}
+    );
+  }, [data]);
+  return (
+    <button className="button-full" onClick={onClick} {...props}>
+      View on Bangle
+    </button>
+  );
+});
+
+const useFormField = ({ initial, key, onChange }) => {
+  const [value, setValue] = useState(initial);
+  const onChangeField = useCallback(
+    (evt) => {
+      setValue(evt.target.value);
+    },
+    [setValue]
+  );
+
+  useEffect(() => {
+    onChange(key, value);
+  }, [onChange, key, value]);
+
+  return {
+    name: key,
+    value,
+    onChange: onChangeField,
+  };
 };
 
 const UploadField = ({ onAddImage }) => {
@@ -103,45 +157,6 @@ const Code = (props) => (
     <code className="code-content" {...props} />
   </pre>
 );
-
-const useFormField = ({ initial, key, onChange }) => {
-  const [value, setValue] = useState(initial);
-  const onChangeField = useCallback(
-    (evt) => {
-      setValue(evt.target.value);
-    },
-    [setValue]
-  );
-
-  useEffect(() => {
-    onChange(key, value);
-  }, [onChange, key, value]);
-
-  return {
-    name: key,
-    value,
-    onChange: onChangeField,
-  };
-};
-
-const bpps = {
-  1: '1bit',
-  2: '2bitbw',
-  3: '3bit',
-  4: '4bitmac',
-  8: 'web',
-  16: 'rgb565',
-};
-
-const diffusions = {
-  none: 'Nearest color (flat)',
-  random1: 'Random small',
-  random2: 'Random large',
-  error: 'Error Diffusion',
-  errorrandom: 'Randomised Error Diffusion',
-  bayer2: '2x2 Bayer',
-  bayer4: '4x4 Bayer',
-};
 
 const ImageSettings = memo(({ onChange }) => {
   const contrast = useFormField({ initial: 0, key: 'contrast', onChange });
@@ -264,15 +279,7 @@ const ImageFile = ({ file, onAddToAlbum, removeImage }) => {
           <div>
             {data.length} bytes
             <br />
-            <button
-              className="button-full"
-              onClick={() => {
-                const js = `g.setColor(0x000000).setBgColor(0xFFFFFF).clear().drawImage(require("heatshrink").decompress(atob("${data}")));`;
-                UART.eval(js, console.log);
-              }}
-            >
-              Test on Bangle
-            </button>
+            <ViewOnBangleButton data={data} />
             <br />
             <button
               onClick={() => {
@@ -416,21 +423,29 @@ const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
   );
 };
 
-const AlbumImage = ({ data, name, removeFromAlbum, ...props }) => {
+const AlbumImage = ({ data, name, removeFromAlbum }) => {
+  const [url, setUrl] = useState(null);
+
+  // let's convert our compressed espruino image to an url resource
+  useEffect(() => {
+    const buffer = new Uint8Array(
+      atob(data)
+        .split('')
+        .map((c) => c.charCodeAt(0))
+    );
+    const rawData = heatshrink.decompress(buffer);
+    let str = '';
+    for (let n = 0; n < rawData.length; n++)
+      str += String.fromCharCode(rawData[n]);
+    const url = imageconverter.stringToImageURL(str);
+    setUrl(url);
+  }, [data, setUrl]);
+
   return (
-    <div className="row">
-      <p>{name}</p>
-      <textarea value={data} />
-      <div>
-        <button
-          className="button-full"
-          onClick={() => {
-            const js = `g.setColor(0x000000).setBgColor(0xFFFFFF).clear().drawImage(require("heatshrink").decompress(atob("${data}")));`;
-            UART.eval(js, console.log);
-          }}
-        >
-          View on Bangle
-        </button>
+    <div className="row" style={{ margin: '.4em 0' }}>
+      <img src={url} />
+      <div style={{ marginLeft: 'auto' }}>
+        <ViewOnBangleButton data={data} />
 
         <button
           className="button-full"
@@ -456,14 +471,6 @@ const Album = ({ setAlbums, removeFromAlbum, id, name, images }) => {
   return (
     <section className="container">
       <label htmlFor="input_name">Name</label>
-      {images.map((image) => (
-        <AlbumImage
-          key={image.name}
-          data={image.data}
-          name={image.name}
-          removeFromAlbum={removeFromAlbum}
-        />
-      ))}
       <input
         ref={ref}
         id="input_name"
@@ -476,6 +483,14 @@ const Album = ({ setAlbums, removeFromAlbum, id, name, images }) => {
           );
         }}
       />
+      {images.map((image) => (
+        <AlbumImage
+          key={image.name}
+          data={image.data}
+          name={image.name}
+          removeFromAlbum={removeFromAlbum}
+        />
+      ))}
     </section>
   );
 };
