@@ -62,7 +62,7 @@ function onSwipe(lr, ud) {
   }
 }
 
-let albums = require('Storage').readJSON('albums.json');
+let albums = require('Storage').readJSON('albums.json.data');
 let images = albums && albums.length ? albums[0].images : [];
 const w = g.getWidth();
 let currImg = 0;

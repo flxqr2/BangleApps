@@ -3,7 +3,7 @@
   "name": "Image album viewer",
   "shortName": "Albums",
   "version": "0.01",
-  "description": "Upload images from your computer through the App Loader und scroll trough images organized in albums on your watch",
+  "description": "Upload images from your computer through the App Loader und swipe trough images organized in albums on your watch",
   "icon": "albums-icon.png",
   "tags": "utilities,photos",
   "supports": ["BANGLEJS2"],
@@ -12,7 +12,7 @@
   "storage": [
     { "name": "albums.app.js", "url": "albums.app.js" },
     { "name": "albums.img", "url": "albums-icon.js", "evaluate": true },
-    { "name": "albums.json", "url": "albums.json" },
+    { "name": "albums.json.data", "url": "albums.json.data" },
     { "name": "albums.data", "url": "albums.data" }
   ]
 }

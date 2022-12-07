@@ -2,7 +2,7 @@
 
 files on bangle
 
-- albums.json
+- albums.json.data
 [
 	{
 		id: "uid",
@@ -362,7 +362,7 @@ const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
             onClick={() => {
               setLoading(true);
               UART.eval(
-                'require("Storage").readJSON("albums.json")',
+                'require("Storage").readJSON("albums.json.data")',
                 (albums) => {
                   UART.eval(
                     'require("Storage").read("albums.data")',
@@ -425,7 +425,7 @@ const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
         onClick={() => {
           setLoading(true);
           UART.eval(
-            `require("Storage").write("albums.json",'${jsonFile}');`,
+            `require("Storage").write("albums.json.data",'${jsonFile}');`,
             (data) => {
               UART.eval(
                 `require('Storage').write('albums.data', '${dataFile}')`,

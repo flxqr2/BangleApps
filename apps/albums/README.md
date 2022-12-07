@@ -1,6 +1,6 @@
 # Albums
 
-Upload images from your computer through the App Loader und scroll trough images organized in albums on your watch
+Upload images from your computer through the App Loader und swipe trough images organized in albums on your watch
 
 ## Usage
 
