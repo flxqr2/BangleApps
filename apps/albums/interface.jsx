@@ -1,4 +1,5 @@
-const { useRef, useState, useMemo, useEffect, useCallback, memo } = React;
+const { useRef, useState, useMemo, useEffect, useCallback, memo, Fragment } =
+  React;
 
 const bpps = {
   1: '1bit',
@@ -17,6 +18,16 @@ const diffusions = {
   errorrandom: 'Randomised Error Diffusion',
   bayer2: '2x2 Bayer',
   bayer4: '4x4 Bayer',
+};
+
+const checksum = (s) => {
+  if (!s) return null;
+  var chk = 0x12345678;
+  var len = s.length;
+  for (var i = 0; i < len; i++) {
+    chk += s.charCodeAt(i) * (i + 1);
+  }
+  return (chk & 0xffffffff).toString(16);
 };
 
 const uid = () => {
@@ -62,20 +73,34 @@ const useFormField = ({ initial, key, onChange }) => {
   };
 };
 
+const Hr = (props) => (
+  <div
+    style={{
+      minHeight: '0.8rem',
+      marginBottom: '1rem',
+      boxShadow: '0 2px 4px -3px black',
+    }}
+    {...props}
+  />
+);
+
 const UploadField = ({ onAddImage }) => {
-  const ref = useRef();
   const onChange = useCallback(
     (evt) => {
-      const files = ref.current.files;
+      const files = evt.target.files;
       for (const file of files) {
         if (file.type.indexOf('image/') === 0) {
           onAddImage(file);
         }
       }
     },
-    [ref, onAddImage]
+    [onAddImage]
   );
-  return <input ref={ref} type="file" onChange={onChange} />;
+  return (
+    <div style={{ width: 0, height: 0, overflow: 'hidden' }}>
+      <input type="file" onChange={onChange} />
+    </div>
+  );
 };
 
 const DropZone = ({ onAddImage }) => {
@@ -100,11 +125,28 @@ const DropZone = ({ onAddImage }) => {
 
   return (
     <div
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      style={{ height: '4rem', background: '#9b4dca', borderRadius: '1rem' }}
+      className="container"
+      style={{
+        position: 'sticky',
+        bottom: 0,
+      }}
     >
-      Drop Image Files
+      <label
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        style={{
+          margin: 0,
+          padding: '2rem',
+          background: 'rgb(198 243 172)',
+          borderRadius: '1rem',
+          textAlign: 'center',
+          boxShadow: 'black 0px -3px 4px -4px',
+          cursor: 'pointer',
+        }}
+      >
+        Drop image files <u>here</u> or click to add images
+        <UploadField onAddImage={onAddImage} />
+      </label>
     </div>
   );
 };
@@ -174,38 +216,49 @@ const ImageSettings = memo(({ onChange }) => {
 
   return (
     <form>
-      <label htmlFor="inp-contrast">Contrast</label>
-      <input
-        id="inp-contrast"
-        {...contrast}
-        type="range"
-        min="-255"
-        max="255"
-        step="0.001"
-      />
-      <label htmlFor="inp-brightness">Brightness</label>
-      <input
-        id="inp-brightness"
-        {...brightness}
-        type="range"
-        min="-255"
-        max="255"
-        step="0.001"
-      />
-      <label htmlFor="inp-mode">Mode</label>
-      <select id="inp-mode" {...mode}>
-        {Object.keys(bpps).map((k) => (
-          <option key={k}>{bpps[k]}</option>
-        ))}
-      </select>
-      <label htmlFor="inp-diffusion">Diffusion</label>
-      <select id="inp-diffusion" {...diffusion}>
-        {Object.keys(diffusions).map((k) => (
-          <option key={k} value={k}>
-            {diffusions[k]}
-          </option>
-        ))}
-      </select>
+      <div>
+        <label htmlFor="inp-contrast">Contrast</label>
+        <input
+          style={{ width: '100%' }}
+          id="inp-contrast"
+          {...contrast}
+          type="range"
+          min="-255"
+          max="255"
+          step="0.001"
+        />
+        <label htmlFor="inp-brightness">Brightness</label>
+        <input
+          style={{ width: '100%' }}
+          id="inp-brightness"
+          {...brightness}
+          type="range"
+          min="-255"
+          max="255"
+          step="0.001"
+        />
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+        }}
+      >
+        <label htmlFor="inp-mode">Mode</label>
+        <select id="inp-mode" {...mode}>
+          {Object.keys(bpps).map((k) => (
+            <option key={k}>{bpps[k]}</option>
+          ))}
+        </select>
+        <label htmlFor="inp-diffusion">Diffusion</label>
+        <select id="inp-diffusion" {...diffusion}>
+          {Object.keys(diffusions).map((k) => (
+            <option key={k} value={k}>
+              {diffusions[k]}
+            </option>
+          ))}
+        </select>
+      </div>
     </form>
   );
 });
@@ -263,34 +316,38 @@ const ImageFile = ({ file, onAddToAlbum, removeImage }) => {
         <div>
           <img
             src={src}
-            ref={img}
             onLoad={() => setLoaded(true)}
             style={{ width: '176px', height: 'auto' }}
           />
+          <div style={{ overflow: 'hidden' }}>
+            <img
+              src={src}
+              ref={img}
+              onLoad={() => setLoaded(true)}
+              style={{ position: 'absolute', display: 'none' }}
+            />
+          </div>
         </div>
-        <ImageSettings onChange={onChangeSettings} />
         <div>
           <canvas ref={canvas} width={176} height={176} />
         </div>
       </div>
+      <ImageSettings onChange={onChangeSettings} />
       {!!data && (
-        <div className="row">
-          <Code>{data}</Code>
-          <div>
-            {data.length} bytes
-            <br />
-            <ViewOnBangleButton data={data} />
-            <br />
-            <button
-              onClick={() => {
-                onAddToAlbum({ name: file.name, data });
-                removeImage(file);
-              }}
-            >
-              Add to album
-            </button>
-          </div>
-        </div>
+        <p style={{ display: 'flex' }}>
+          {data.length} bytes
+          <br />
+          <ViewOnBangleButton data={data} />
+          <br />
+          <button
+            onClick={() => {
+              onAddToAlbum({ name: file.name, data });
+              removeImage(file);
+            }}
+          >
+            Add to album
+          </button>
+        </p>
       )}
     </article>
   );
@@ -309,144 +366,253 @@ const ListEntry = ({ file, onAddToAlbum, removeImage }) => {
   );
 };
 
-const BangleConnect = ({ albums, setAlbums, setCurrentAlbum }) => {
+const BangleConnect = ({
+  albums,
+  setAlbums,
+  setBangleQueried,
+  bangleQueried,
+}) => {
+  const checksums = useRef({
+    current: checksum(JSON.stringify([])),
+    original: checksum(JSON.stringify([])),
+  });
   const [storageStats, setStorageStats] = useState();
 
-  const { jsonFile, dataFile } = useMemo(() => {
+  const convertToBangleJson = useCallback((albums) => {
+    // sequential image data
     let dataStr = '';
-    const jsonData = albums.map((album) => {
-      return {
-        ...album,
-        images: album.images.map((image) => {
-          const offset = dataStr.length;
-          dataStr += image.data;
-          return {
-            name: image.name,
-            offset,
-            length: image.data.length,
-          };
-        }),
-      };
-    });
+    const jsonData = albums
+      .map((album) => {
+        // let's ignore empty albums
+        if (!album.images || !album.images.length) return null;
+
+        const keys = [];
+        return {
+          ...album,
+          images: album.images.map((image) => {
+            const offset = dataStr.length;
+            dataStr += image.data || '';
+            // let's ignore duplicate file names
+            if (keys.includes(image.name)) {
+              return null;
+            }
+            keys.push(image.name);
+            return {
+              name: image.name,
+              offset,
+              length: image.data.length,
+            };
+          }),
+        };
+      })
+      .filter((a) => !!a);
+    return { dataStr, jsonData };
+  }, []);
+
+  // let's convert album info to json and data for bangle
+  const { jsonFile, dataFile } = useMemo(() => {
+    // albums info data
+    const { dataStr, jsonData } = convertToBangleJson(albums);
+    const json = JSON.stringify(jsonData);
+
+    checksums.current.current = checksum(json);
 
     return {
-      jsonFile: JSON.stringify(jsonData),
+      jsonFile: json,
       dataFile: dataStr,
     };
-  }, [albums]);
+  }, [albums, convertToBangleJson]);
+
+  // to the albums data from bangle
+  // read json and data files
+  const getBangleData = useCallback(() => {
+    UART.eval(
+      'require("Storage").readJSON("albums.json.data")',
+      (albums, err) => {
+        if (err) {
+          console.error(err);
+          console.error('could not get albums json data file from bangle');
+          return;
+        }
+
+        UART.eval('require("Storage").read("albums.data")', (data, err) => {
+          if (!data || err) {
+            console.error(
+              'could not get albums image data file from bangle',
+              err
+            );
+            return;
+          }
+          const _albums = albums
+            .map((album) => {
+              return !album || !album.images || !album.images.length
+                ? null
+                : {
+                    ...album,
+                    images: album.images
+                      .map((image) =>
+                        !image
+                          ? null
+                          : {
+                              ...image,
+                              data: data.substring(
+                                image.offset,
+                                image.offset + image.length
+                              ),
+                            }
+                      )
+                      .filter((i) => !!i),
+                  };
+            })
+            .filter((a) => !!a);
+
+          checksums.current.original = checksum(
+            JSON.stringify(convertToBangleJson(_albums))
+          );
+
+          setAlbums(_albums);
+          setBangleQueried(true);
+
+          UART.eval('require("Storage").getStats()', (data) => {
+            setStorageStats(data);
+          });
+        });
+      }
+    );
+  }, [
+    checksums,
+    setAlbums,
+    setStorageStats,
+    setBangleQueried,
+    convertToBangleJson,
+  ]);
+
+  const writeBangleData = useCallback(async () => {
+    const dataChecksum = checksum(dataFile);
+    UART.eval(
+      `require("Storage").write("albums.json.data",'${jsonFile}');`,
+      (data) => {
+        console.log('wrote json data', data);
+        UART.eval(
+          `require('Storage').write('albums.data', '${dataFile}')`,
+          (data) => {
+            // let's test if result equals sent
+            UART.eval(`require('Storage').read('albums.data')`, (data) => {
+              // let's test if result equals sent
+              if (dataChecksum !== checksum(data)) {
+                // TODO
+                console.error('not equal');
+              } else {
+                console.log('done');
+              }
+            });
+          }
+        );
+      }
+    );
+  }, [jsonFile, dataFile]);
 
   return (
-    <section className="container">
-      <div className="row">
-        <h1 className="column column-75">Bangle</h1>
-        <div className="column column-25">
-          <button
-            className="float-right"
-            onClick={() => {
-              UART.eval(
-                'require("Storage").readJSON("albums.json.data")',
-                (albums) => {
-                  UART.eval(
-                    'require("Storage").read("albums.data")',
-                    (data) => {
-                      if (data) {
-                        setAlbums(
-                          albums.map((album) => {
-                            return {
-                              ...album,
-                              images: album.images.map((image) => ({
-                                ...image,
-                                data: data.substring(
-                                  image.offset,
-                                  image.offset + image.length
-                                ),
-                              })),
-                            };
-                          })
-                        );
-                        setCurrentAlbum(album.id);
-                      }
-                      UART.eval('require("Storage").getStats()', (data) => {
-                        setStorageStats(data);
-                      });
-                    }
-                  );
-                }
-              );
-            }}
-          >
-            Connect
-          </button>
-        </div>
-      </div>
-      {!!storageStats && (
-        <div
-          style={{ display: 'flex', background: 'red', height: '2px' }}
-          title={`free space: ${
-            (100 / storageStats.totalBytes) * storageStats.freeBytes
-          }%`}
-        >
-          <div
-            style={{
-              flex: `0 0 ${
-                (100 / storageStats.totalBytes) * storageStats.freeBytes
-              }%`,
-              background: 'green',
-              marginLeft: 'auto',
-            }}
-          />
-        </div>
-      )}
-      <div>File contents: </div>
-      <Code>{jsonFile}</Code>
-      <Code>{dataFile}</Code>
-      <button
-        style={{ marginLeft: 'auto', display: 'block' }}
-        onClick={() => {
-          UART.eval(
-            `require("Storage").write("albums.json.data",'${jsonFile}');`,
-            (data) => {
-              UART.eval(
-                `require('Storage').write('albums.data', '${dataFile}')`,
-                (data) => {
-                  console.log('done');
-                }
-              );
-            }
-          );
+    <Fragment>
+      <div
+        style={{
+          display: 'flex',
+          position: 'sticky',
+          top: 0,
+          zIndex: 3,
+          background: 'white',
         }}
       >
-        Upload
-      </button>
-      <div className="clear" />
-    </section>
+        <button className="button-full" onClick={getBangleData}>
+          Get albums from Bangle
+        </button>
+        {!!bangleQueried && (
+          <Fragment>
+            <div style={{ flex: '1 1 100%' }} />
+            <button
+              disabled={
+                checksums.current.original === checksums.current.current
+              }
+              style={{ marginLeft: 'auto', display: 'block' }}
+              onClick={writeBangleData}
+            >
+              Upload
+            </button>
+          </Fragment>
+        )}
+      </div>
+      <section className="container">
+        {!!bangleQueried && !!storageStats && (
+          <Fragment>
+            <section>
+              <h5 style={{ margin: 0 }}>Bangle Storage: </h5>
+
+              <div
+                style={{
+                  display: 'flex',
+                  background: 'red',
+                  height: '2px',
+                  margin: '0 0 2.5rem 0',
+                }}
+                title={`free space: ${
+                  (100 / storageStats.totalBytes) * storageStats.freeBytes
+                }%`}
+              >
+                <div
+                  style={{
+                    flex: `0 0 ${
+                      (100 / storageStats.totalBytes) * storageStats.freeBytes
+                    }%`,
+                    background: 'green',
+                    marginLeft: 'auto',
+                  }}
+                />
+              </div>
+            </section>
+            <section>
+              <h5 style={{ margin: 0 }}>File contents: </h5>
+              <Code>{jsonFile}</Code>
+              <Code>{dataFile}</Code>
+            </section>
+          </Fragment>
+        )}
+      </section>
+    </Fragment>
   );
 };
 
 const AlbumImage = ({ data, name, removeFromAlbum }) => {
   const [url, setUrl] = useState(null);
-
   // let's convert our compressed espruino image to an url resource
   useEffect(() => {
-    const buffer = new Uint8Array(
-      atob(data)
-        .split('')
-        .map((c) => c.charCodeAt(0))
-    );
-    const rawData = heatshrink.decompress(buffer);
-    let str = '';
-    for (let n = 0; n < rawData.length; n++)
-      str += String.fromCharCode(rawData[n]);
-    const url = imageconverter.stringToImageURL(str);
-    setUrl(url);
+    try {
+      const buffer = new Uint8Array(
+        atob(data)
+          .split('')
+          .map((c) => c.charCodeAt(0))
+      );
+      const rawData = heatshrink.decompress(buffer);
+      let str = '';
+      for (let n = 0; n < rawData.length; n++)
+        str += String.fromCharCode(rawData[n]);
+      const url = imageconverter.stringToImageURL(str);
+      setUrl(url);
+    } catch (err) {
+      console.error(err.message);
+    }
   }, [data, setUrl]);
 
   return (
-    <div className="row" style={{ margin: '.4em 0' }}>
-      <img src={url} />
-      <div style={{ marginLeft: 'auto' }}>
+    <div
+      style={{
+        margin: '.4em 0',
+        display: 'flex',
+        justifyContent: 'space-between',
+      }}
+    >
+      <img src={url} width="176" height="176" />
+      <div>
         <ViewOnBangleButton data={data} />
-
         <button
           className="button-full"
           onClick={() => {
@@ -483,22 +649,49 @@ const Album = ({ setAlbums, removeFromAlbum, id, name, images }) => {
           );
         }}
       />
-      {images.map((image) => (
-        <AlbumImage
-          key={image.name}
-          data={image.data}
-          name={image.name}
-          removeFromAlbum={removeFromAlbum}
-        />
-      ))}
+      {!!images &&
+        images.map((image) => (
+          <AlbumImage
+            key={image.name}
+            data={image.data}
+            name={image.name}
+            removeFromAlbum={removeFromAlbum}
+          />
+        ))}
     </section>
   );
 };
 
+const AlbumButton = ({ name, isCurrent, ...props }) => {
+  const ref = useRef();
+  useEffect(() => {
+    if (!isCurrent) return;
+    requestAnimationFrame(() => {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [ref, isCurrent]);
+  return (
+    <button
+      ref={ref}
+      style={{ margin: '0 .2rem' }}
+      disabled={isCurrent}
+      {...props}
+    >
+      {name}
+    </button>
+  );
+};
+
 const Main = () => {
+  const [bangleQueried, setBangleQueried] = useState(false);
   const [images, setImages] = useState([]);
   const [albums, setAlbums] = useState([]);
   const [currentAlbum, setCurrentAlbum] = useState();
+
+  useEffect(() => {
+    if (currentAlbum || !albums || !albums.length) return;
+    setCurrentAlbum(albums[0].id);
+  }, [albums, currentAlbum, setCurrentAlbum]);
 
   const addImage = useCallback(
     (image) => {
@@ -523,7 +716,7 @@ const Main = () => {
         prev.map((album) =>
           album.id === currentAlbum
             ? { ...album, images: [...album.images, { name, data }] }
-            : album
+            : { ...album }
         )
       );
     },
@@ -546,69 +739,90 @@ const Main = () => {
     [currentAlbum, setAlbums, setImages]
   );
 
+  const createAlbum = useCallback(() => {
+    const id = uid();
+    setAlbums((albums) => [...albums, { id, name: 'new', images: [] }]);
+    setCurrentAlbum(id);
+  }, [setAlbums, setCurrentAlbum]);
+
   return (
     <main>
       <BangleConnect
         setAlbums={setAlbums}
         setCurrentAlbum={setCurrentAlbum}
         albums={albums}
+        setBangleQueried={setBangleQueried}
+        bangleQueried={bangleQueried}
       />
 
-      <div className="container">
-        <h2>Albums</h2>
-        <nav style={{ display: 'flex', overflow: 'auto' }}>
-          {albums.map(({ id, name }) => (
-            <button
-              style={{ margin: '.2em' }}
-              key={id}
-              disabled={currentAlbum === id}
-              onClick={() => {
-                setCurrentAlbum(id);
-              }}
-            >
-              {name}
-            </button>
-          ))}
-          <button
+      {bangleQueried && (
+        <div>
+          <nav
             style={{
               position: 'sticky',
-              right: '.2em',
-              margin: '.2em',
-              marginLeft: 'auto',
-            }}
-            onClick={() => {
-              const id = uid();
-              setAlbums([...albums, { id, name: 'new', images: [] }]);
-              setCurrentAlbum(id);
+              top: '-1.8rem',
+              zIndex: 2,
+              boxShadow: '0 2px 4px -3px black',
             }}
           >
-            Create Album
-          </button>
-        </nav>
-      </div>
-      {!!currentAlbum && (
-        <Album
-          setAlbums={setAlbums}
-          removeFromAlbum={removeFromAlbum}
-          {...albums.find((a) => a.id === currentAlbum)}
-        />
-      )}
+            <div className="container">
+              <h2>Albums</h2>
+              <div
+                style={{
+                  display: 'flex',
+                  overflow: 'auto',
+                  background: 'white',
+                  margin: '0 -.2rem',
+                }}
+              >
+                {albums.map(({ id, name }) => (
+                  <AlbumButton
+                    key={id}
+                    name={name}
+                    isCurrent={currentAlbum === id}
+                    onClick={() => {
+                      setCurrentAlbum(id);
+                    }}
+                  />
+                ))}
+                <button
+                  style={{
+                    position: 'sticky',
+                    right: '.2em',
+                    margin: '.2em',
+                    marginLeft: 'auto',
+                  }}
+                  onClick={createAlbum}
+                >
+                  Create Album
+                </button>
+              </div>
+            </div>
+          </nav>
+          {!!currentAlbum && (
+            <Album
+              setAlbums={setAlbums}
+              removeFromAlbum={removeFromAlbum}
+              {...albums.find((a) => a.id === currentAlbum)}
+            />
+          )}
 
-      {!!currentAlbum && (
-        <div className="container">
+          {(1 || !!currentAlbum) && (
+            <div className="container">
+              <section title="Picture for album">
+                {images.map((file) => (
+                  <ListEntry
+                    key={file.name}
+                    file={file}
+                    onAddToAlbum={onAddToAlbum}
+                    removeImage={removeImage}
+                  />
+                ))}
+              </section>
+            </div>
+          )}
+
           <DropZone onAddImage={addImage} />
-          <UploadField onAddImage={addImage} />
-
-          <section title="Picture for album">
-            {images.map((file) => (
-              <ListEntry
-                key={file.name}
-                file={file}
-                onAddToAlbum={onAddToAlbum}
-                removeImage={removeImage}
-              />
-            ))}
-          </section>
         </div>
       )}
     </main>

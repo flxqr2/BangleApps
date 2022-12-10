@@ -36,6 +36,9 @@
     <script src="../../webtools/heatshrink.js"></script>
     <script src="../../webtools/imageconverter.js"></script>
     <script src="../../webtools/uart.js"></script>
+    <script>
+      UART.debug = 2;
+    </script>
     <div id="root">
       <div
         style="
@@ -51,11 +54,11 @@
     <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
     <script
       crossorigin
-      src="https://unpkg.com/react@18/umd/react.production.min.js"
+      src="https://unpkg.com/react@18/umd/react.development.js"
     ></script>
     <script
       crossorigin
-      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+      src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"
     ></script>
     <script type="text/babel" src="./interface.jsx"></script>
   </body>
