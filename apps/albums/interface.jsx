@@ -1,5 +1,13 @@
-const { useRef, useState, useMemo, useEffect, useCallback, memo, Fragment } =
-  React;
+const {
+  useRef,
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  memo,
+  forwardRef,
+  Fragment,
+} = React;
 
 const bpps = {
   1: '1bit',
@@ -200,7 +208,7 @@ const Code = (props) => (
   </pre>
 );
 
-const ImageSettings = memo(({ onChange }) => {
+const ImageSettings = memo(({ data, onChange }) => {
   const contrast = useFormField({ initial: 0, key: 'contrast', onChange });
   const brightness = useFormField({ initial: 0, key: 'brightness', onChange });
   const mode = useFormField({
@@ -216,54 +224,81 @@ const ImageSettings = memo(({ onChange }) => {
 
   return (
     <form>
-      <div>
-        <label htmlFor="inp-contrast">Contrast</label>
-        <input
-          style={{ width: '100%' }}
-          id="inp-contrast"
-          {...contrast}
-          type="range"
-          min="-255"
-          max="255"
-          step="0.001"
-        />
-        <label htmlFor="inp-brightness">Brightness</label>
-        <input
-          style={{ width: '100%' }}
-          id="inp-brightness"
-          {...brightness}
-          type="range"
-          min="-255"
-          max="255"
-          step="0.001"
-        />
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: '.4rem',
+        }}
+      >
+        <div
+          style={{
+            flex: '1 1 auto',
+          }}
+        >
+          <label htmlFor="inp-contrast">Contrast</label>
+          <input
+            style={{ width: '100%' }}
+            id="inp-contrast"
+            {...contrast}
+            type="range"
+            min="-255"
+            max="255"
+            step="0.001"
+          />
+        </div>
+        <div
+          style={{
+            flex: '1 1 auto',
+          }}
+        >
+          <label htmlFor="inp-brightness">Brightness</label>
+          <input
+            style={{ width: '100%' }}
+            id="inp-brightness"
+            {...brightness}
+            type="range"
+            min="-255"
+            max="255"
+            step="0.001"
+          />
+        </div>
       </div>
       <div
         style={{
           display: 'flex',
           alignItems: 'baseline',
+          gap: '.4rem',
         }}
       >
-        <label htmlFor="inp-mode">Mode</label>
-        <select id="inp-mode" {...mode}>
-          {Object.keys(bpps).map((k) => (
-            <option key={k}>{bpps[k]}</option>
-          ))}
-        </select>
-        <label htmlFor="inp-diffusion">Diffusion</label>
-        <select id="inp-diffusion" {...diffusion}>
-          {Object.keys(diffusions).map((k) => (
-            <option key={k} value={k}>
-              {diffusions[k]}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label htmlFor="inp-mode">Mode</label>
+          <select id="inp-mode" {...mode}>
+            {Object.keys(bpps).map((k) => (
+              <option key={k}>{bpps[k]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="inp-diffusion">Diffusion</label>
+          <select id="inp-diffusion" {...diffusion}>
+            {Object.keys(diffusions).map((k) => (
+              <option key={k} value={k}>
+                {diffusions[k]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="inp-size">Size (bytes)</label>
+          <input readOnly id="inp-size" value={data.length} />
+        </div>
       </div>
     </form>
   );
 });
 
-const ImageFile = ({ file, onAddToAlbum, removeImage }) => {
+const ImageFile = forwardRef(({ file, onAddToAlbum, removeImage }, ref) => {
   const img = useRef();
   const canvas = useRef();
 
@@ -310,9 +345,12 @@ const ImageFile = ({ file, onAddToAlbum, removeImage }) => {
   }, [setData, canvas, img, file, settings, loaded]);
 
   return (
-    <article>
+    <article
+      ref={ref}
+      style={{ padding: '.4rem', borderTop: '1px solid #ccc' }}
+    >
       <h1 style={{ margin: 0, fontSize: '100%' }}>{file.name}</h1>
-      <div className="row">
+      <div style={{ display: 'flex', gap: '.4rem' }}>
         <div>
           <img
             src={src}
@@ -332,13 +370,10 @@ const ImageFile = ({ file, onAddToAlbum, removeImage }) => {
           <canvas ref={canvas} width={176} height={176} />
         </div>
       </div>
-      <ImageSettings onChange={onChangeSettings} />
+      <ImageSettings onChange={onChangeSettings} data={data} />
       {!!data && (
-        <p style={{ display: 'flex' }}>
-          {data.length} bytes
-          <br />
+        <p style={{ display: 'flex', gap: '.4rem' }}>
           <ViewOnBangleButton data={data} />
-          <br />
           <button
             onClick={() => {
               onAddToAlbum({ name: file.name, data });
@@ -351,14 +386,22 @@ const ImageFile = ({ file, onAddToAlbum, removeImage }) => {
       )}
     </article>
   );
-};
+});
 
 const ListEntry = ({ file, onAddToAlbum, removeImage }) => {
+  const ref = useRef();
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, [ref, file]);
+
   const isSvg = useMemo(() => file.type === 'image/svg+xml', [file.type]);
   return isSvg ? (
-    <SvgFile file={file} />
+    <SvgFile file={file} ref={ref} />
   ) : (
     <ImageFile
+      ref={ref}
       file={file}
       onAddToAlbum={onAddToAlbum}
       removeImage={removeImage}
@@ -366,6 +409,7 @@ const ListEntry = ({ file, onAddToAlbum, removeImage }) => {
   );
 };
 
+const showDebug = false;
 const BangleConnect = ({
   albums,
   setAlbums,
@@ -380,51 +424,64 @@ const BangleConnect = ({
 
   const convertToBangleJson = useCallback((albums) => {
     // sequential image data
-    let dataStr = '';
+    const newFiles = [];
+    // deletable files
+    const deleteFiles = [];
     const jsonData = albums
       .map((album) => {
         // let's ignore empty albums
         if (!album.images || !album.images.length) return null;
 
-        const keys = [];
+        const ids = [];
         return {
           ...album,
-          images: album.images.map((image) => {
-            const offset = dataStr.length;
-            dataStr += image.data || '';
-            // let's ignore duplicate file names
-            if (keys.includes(image.name)) {
-              return null;
-            }
-            keys.push(image.name);
-            return {
-              name: image.name,
-              offset,
-              length: image.data.length,
-            };
-          }),
+          images: album.images
+            .map((image) => {
+              if (image.removed) {
+                deleteFiles.push(image.fileName);
+                return null;
+              }
+              // let's ignore duplicate ids
+              if (ids.includes(image.id)) {
+                return null;
+              }
+              ids.push(image.id);
+
+              if (image.data) {
+                newFiles.push({
+                  name: `albums.data.${album.id}.${image.id}`,
+                  data: image.data,
+                });
+              }
+
+              return {
+                id: image.id,
+                name: image.name,
+              };
+            })
+            .filter((i) => !!i),
         };
       })
       .filter((a) => !!a);
-    return { dataStr, jsonData };
+
+    return { newFiles, deleteFiles, jsonData };
   }, []);
 
-  // let's convert album info to json and data for bangle
-  const { jsonFile, dataFile } = useMemo(() => {
-    // albums info data
-    const { dataStr, jsonData } = convertToBangleJson(albums);
+  // let's convert album info to data for bangle
+  const { jsonFile, newFiles, deleteFiles } = useMemo(() => {
+    const { newFiles, jsonData, deleteFiles } = convertToBangleJson(albums);
     const json = JSON.stringify(jsonData);
 
     checksums.current.current = checksum(json);
 
     return {
       jsonFile: json,
-      dataFile: dataStr,
+      newFiles,
+      deleteFiles,
     };
   }, [albums, convertToBangleJson]);
 
-  // to the albums data from bangle
-  // read json and data files
+  // read json file from bangle
   const getBangleData = useCallback(() => {
     UART.eval(
       'require("Storage").readJSON("albums.json.data")',
@@ -435,47 +492,40 @@ const BangleConnect = ({
           return;
         }
 
-        UART.eval('require("Storage").read("albums.data")', (data, err) => {
-          if (!data || err) {
-            console.error(
-              'could not get albums image data file from bangle',
-              err
-            );
-            return;
-          }
-          const _albums = albums
-            .map((album) => {
-              return !album || !album.images || !album.images.length
-                ? null
-                : {
-                    ...album,
-                    images: album.images
-                      .map((image) =>
-                        !image
-                          ? null
-                          : {
-                              ...image,
-                              data: data.substring(
-                                image.offset,
-                                image.offset + image.length
-                              ),
-                            }
-                      )
-                      .filter((i) => !!i),
-                  };
-            })
-            .filter((a) => !!a);
+        const _albums = albums
+          .map((album) => {
+            return !album || !album.images || !album.images.length
+              ? null
+              : {
+                  ...album,
+                  images: album.images
+                    .map((image) =>
+                      !image
+                        ? null
+                        : {
+                            ...image,
+                          }
+                    )
+                    .filter((i) => !!i),
+                };
+          })
+          .filter((a) => !!a);
 
-          checksums.current.original = checksum(
-            JSON.stringify(convertToBangleJson(_albums))
-          );
+        checksums.current.original = checksum(JSON.stringify(_albums));
 
-          setAlbums(_albums);
-          setBangleQueried(true);
+        setAlbums(
+          _albums.map((a) => ({
+            ...a,
+            images: a.images.map((i) => ({
+              ...i,
+              fileName: `albums.data.${a.id}.${i.id}`,
+            })),
+          }))
+        );
+        setBangleQueried(true);
 
-          UART.eval('require("Storage").getStats()', (data) => {
-            setStorageStats(data);
-          });
+        UART.eval('require("Storage").getStats()', (data) => {
+          setStorageStats(data);
         });
       }
     );
@@ -488,29 +538,35 @@ const BangleConnect = ({
   ]);
 
   const writeBangleData = useCallback(async () => {
-    const dataChecksum = checksum(dataFile);
     UART.eval(
       `require("Storage").write("albums.json.data",'${jsonFile}');`,
       (data) => {
         console.log('wrote json data', data);
-        UART.eval(
-          `require('Storage').write('albums.data', '${dataFile}')`,
-          (data) => {
-            // let's test if result equals sent
-            UART.eval(`require('Storage').read('albums.data')`, (data) => {
-              // let's test if result equals sent
-              if (dataChecksum !== checksum(data)) {
-                // TODO
-                console.error('not equal');
-              } else {
-                console.log('done');
-              }
-            });
-          }
-        );
+
+        // if we have data on our image object, we need to store it
+        // otherwise the file should be be sored on bangle already
+        const js =
+          newFiles
+            .map(
+              ({ name, data }) =>
+                !!data && `require('Storage').write('${name}', '${data}')`
+            )
+            .join(';') +
+          deleteFiles
+            .map(
+              ({ fileName }) =>
+                !!fileName && `require('Storage').erase('${fileName}')`
+            )
+            .join(';');
+
+        UART.eval(js, (data) => {
+          console.log('done');
+          // let's get data from bangle to make sure that everything is in sync
+          getBangleData();
+        });
       }
     );
-  }, [jsonFile, dataFile]);
+  }, [jsonFile, newFiles, deleteFiles, getBangleData]);
 
   return (
     <Fragment>
@@ -542,52 +598,75 @@ const BangleConnect = ({
         )}
       </div>
       <section className="container">
-        {!!bangleQueried && !!storageStats && (
-          <Fragment>
-            <section>
-              <h5 style={{ margin: 0 }}>Bangle Storage: </h5>
+        {!!storageStats && (
+          <section>
+            <h6 style={{ margin: 0 }}>Bangle Storage: </h6>
 
+            <div
+              style={{
+                display: 'flex',
+                background: 'red',
+                height: '2px',
+                margin: '0 0 2.5rem 0',
+              }}
+              title={`free space: ${
+                (100 / storageStats.totalBytes) * storageStats.freeBytes
+              }%`}
+            >
               <div
                 style={{
-                  display: 'flex',
-                  background: 'red',
-                  height: '2px',
-                  margin: '0 0 2.5rem 0',
+                  flex: `0 0 ${
+                    (100 / storageStats.totalBytes) * storageStats.freeBytes
+                  }%`,
+                  background: 'green',
+                  marginLeft: 'auto',
                 }}
-                title={`free space: ${
-                  (100 / storageStats.totalBytes) * storageStats.freeBytes
-                }%`}
-              >
-                <div
-                  style={{
-                    flex: `0 0 ${
-                      (100 / storageStats.totalBytes) * storageStats.freeBytes
-                    }%`,
-                    background: 'green',
-                    marginLeft: 'auto',
-                  }}
-                />
-              </div>
-            </section>
-            <section>
-              <h5 style={{ margin: 0 }}>File contents: </h5>
-              <Code>{jsonFile}</Code>
-              <Code>{dataFile}</Code>
-            </section>
-          </Fragment>
+              />
+            </div>
+          </section>
+        )}
+        {!!showDebug && !!bangleQueried && (
+          <section>
+            <h5 style={{ margin: 0 }}>Sync data: </h5>
+            <Code>{JSON.stringify(checksums)}</Code>
+            <Code>{jsonFile}</Code>
+            <Code>{JSON.stringify(newFiles)}</Code>
+            <Code>{JSON.stringify(deleteFiles)}</Code>
+          </section>
         )}
       </section>
     </Fragment>
   );
 };
 
-const AlbumImage = ({ data, name, removeFromAlbum }) => {
+const AlbumImage = ({ id, data, name, removed, fileName, removeFromAlbum }) => {
+  const [loading, setLoading] = useState(true);
+  const [bangleData, setBangleData] = useState(null);
   const [url, setUrl] = useState(null);
+
+  // let's load image data from bangle if there is no data from album info (i.e. when displaying a new image frmoo upload field)
+  useEffect(() => {
+    if (data) return;
+    setLoading(true);
+    setBangleData(null);
+    UART.eval(`require("Storage").read("${fileName}")`, (data, error) => {
+      if (!data || error) {
+        console.error(error);
+        return;
+      }
+      setBangleData(data);
+    });
+  }, [fileName, data, setBangleData, setLoading]);
+
   // let's convert our compressed espruino image to an url resource
   useEffect(() => {
+    if (!data && !bangleData) {
+      setUrl(null);
+      return;
+    }
     try {
       const buffer = new Uint8Array(
-        atob(data)
+        atob(data || bangleData)
           .split('')
           .map((c) => c.charCodeAt(0))
       );
@@ -600,28 +679,55 @@ const AlbumImage = ({ data, name, removeFromAlbum }) => {
     } catch (err) {
       console.error(err.message);
     }
-  }, [data, setUrl]);
+    setLoading(false);
+  }, [data, bangleData, setUrl, setLoading]);
+
+  const onClickRemove = useCallback(
+    () => removeFromAlbum({ id }),
+    [id, removeFromAlbum]
+  );
 
   return (
     <div
       style={{
-        margin: '.4em 0',
+        padding: '.4em 0',
+        borderTop: '1px solid #ccc',
         display: 'flex',
         justifyContent: 'space-between',
       }}
     >
-      <img src={url} width="176" height="176" />
-      <div>
-        <ViewOnBangleButton data={data} />
-        <button
-          className="button-full"
-          onClick={() => {
-            removeFromAlbum({ name });
+      {loading ? (
+        <div
+          style={{
+            flex: '1 1 auto',
+            height: '176px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
           }}
         >
-          Remove
-        </button>
-      </div>
+          loading {name} …
+        </div>
+      ) : (
+        <Fragment>
+          <img
+            src={url}
+            alt={name}
+            title={name}
+            width="176"
+            height="176"
+            style={{ opacity: removed ? 0.5 : 1 }}
+          />
+          <div style={{ flex: '0 0 4rem' }}>
+            {!!(data || bangleData) && (
+              <ViewOnBangleButton data={data || bangleData} />
+            )}
+            <button className="button-full" onClick={onClickRemove}>
+              {removed ? 'Undelete' : 'Delete'}
+            </button>
+          </div>
+        </Fragment>
+      )}
     </div>
   );
 };
@@ -652,9 +758,12 @@ const Album = ({ setAlbums, removeFromAlbum, id, name, images }) => {
       {!!images &&
         images.map((image) => (
           <AlbumImage
-            key={image.name}
+            key={image.id}
+            id={image.id}
             data={image.data}
             name={image.name}
+            removed={image.removed}
+            fileName={image.fileName}
             removeFromAlbum={removeFromAlbum}
           />
         ))}
@@ -670,6 +779,7 @@ const AlbumButton = ({ name, isCurrent, ...props }) => {
       ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }, [ref, isCurrent]);
+
   return (
     <button
       ref={ref}
@@ -688,11 +798,13 @@ const Main = () => {
   const [albums, setAlbums] = useState([]);
   const [currentAlbum, setCurrentAlbum] = useState();
 
+  // let's select the first available album
   useEffect(() => {
     if (currentAlbum || !albums || !albums.length) return;
     setCurrentAlbum(albums[0].id);
   }, [albums, currentAlbum, setCurrentAlbum]);
 
+  // cb to add an image file to images list from uploadd field / drop zone
   const addImage = useCallback(
     (image) => {
       setImages((images) => [
@@ -703,6 +815,7 @@ const Main = () => {
     [setImages]
   );
 
+  // cb to remove an image file from images list
   const removeImage = useCallback(
     (image) => {
       setImages((images) => [...images.filter((i) => i.name !== image.name)]);
@@ -710,27 +823,40 @@ const Main = () => {
     [setImages]
   );
 
+  // cb to add an image from images list to current album
   const onAddToAlbum = useCallback(
     ({ name, data }) => {
       setAlbums((prev) =>
-        prev.map((album) =>
-          album.id === currentAlbum
-            ? { ...album, images: [...album.images, { name, data }] }
-            : { ...album }
-        )
+        prev.map((album) => {
+          if (album.id !== currentAlbum) return { ...album };
+          let id = 1;
+          while (album.images.find((i) => i.id === id)) {
+            id++;
+          }
+
+          return { ...album, images: [...album.images, { id, name, data }] };
+        })
       );
     },
     [currentAlbum, setAlbums, setImages]
   );
 
   const removeFromAlbum = useCallback(
-    ({ name }) => {
+    ({ id }) => {
       setAlbums((prev) =>
         prev.map((album) =>
           album.id === currentAlbum
             ? {
                 ...album,
-                images: [...album.images.filter((img) => img.name !== name)],
+                images: album.images
+                  .map((img) =>
+                    img.id === id
+                      ? img.data
+                        ? null //  if not yet stored on bangle, remoove immediately
+                        : { ...img, removed: !img.removed } // set removed flag to delete file on bangle
+                      : { ...img }
+                  )
+                  .filter((i) => !!i),
               }
             : album
         )
@@ -740,9 +866,14 @@ const Main = () => {
   );
 
   const createAlbum = useCallback(() => {
-    const id = uid();
-    setAlbums((albums) => [...albums, { id, name: 'new', images: [] }]);
-    setCurrentAlbum(id);
+    setAlbums((albums) => {
+      let id = 1;
+      while (albums.find((a) => a.id === id)) {
+        id++;
+      }
+      setCurrentAlbum(id);
+      return [...albums, { id, name: 'new', images: [] }];
+    });
   }, [setAlbums, setCurrentAlbum]);
 
   return (
@@ -773,6 +904,7 @@ const Main = () => {
                   overflow: 'auto',
                   background: 'white',
                   margin: '0 -.2rem',
+                  padding: '.2rem 0',
                 }}
               >
                 {albums.map(({ id, name }) => (
@@ -789,7 +921,7 @@ const Main = () => {
                   style={{
                     position: 'sticky',
                     right: '.2em',
-                    margin: '.2em',
+                    margin: '0 .2em',
                     marginLeft: 'auto',
                   }}
                   onClick={createAlbum}

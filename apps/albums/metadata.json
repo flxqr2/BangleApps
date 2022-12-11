@@ -13,6 +13,7 @@
     { "name": "albums.app.js", "url": "albums.app.js" },
     { "name": "albums.img", "url": "albums-icon.js", "evaluate": true },
     { "name": "albums.json.data", "url": "albums.json.data" },
-    { "name": "albums.data", "url": "albums.data" }
+    { "name": "albums.data.1.1", "url": "albums.data.1.1" },
+    { "name": "albums.data.1.2", "url": "albums.data.1.2" }
   ]
 }

@@ -5,7 +5,9 @@ function getImage(idx) {
   const i = (idx + images.length) % images.length;
   return require('heatshrink').decompress(
     atob(
-      require('Storage').read('albums.data', images[i].offset, images[i].length)
+      require('Storage').read(
+        'albums.data.' + albums[currAlbum].id + '.' + images[i].id
+      )
     )
   );
 }
