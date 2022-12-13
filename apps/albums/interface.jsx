@@ -9,14 +9,18 @@ const {
   Fragment,
 } = React;
 
-const bpps = {
-  1: '1bit',
-  2: '2bitbw',
-  3: '3bit',
-  4: '4bitmac',
-  8: 'web',
-  16: 'rgb565',
-};
+const bpps = [
+  '1bit',
+  '2bitbw',
+  '3bit',
+  '4bitmac',
+  'web',
+  'rgb565',
+  'opt1bit',
+  'opt2bit',
+  'opt3bit',
+  'opt4bit',
+];
 
 const diffusions = {
   none: 'Nearest color (flat)',
@@ -212,7 +216,7 @@ const ImageSettings = memo(({ data, onChange }) => {
   const contrast = useFormField({ initial: 0, key: 'contrast', onChange });
   const brightness = useFormField({ initial: 0, key: 'brightness', onChange });
   const mode = useFormField({
-    initial: bpps[1],
+    initial: bpps[0],
     key: 'mode',
     onChange,
   });
@@ -274,8 +278,8 @@ const ImageSettings = memo(({ data, onChange }) => {
         <div>
           <label htmlFor="inp-mode">Mode</label>
           <select id="inp-mode" {...mode}>
-            {Object.keys(bpps).map((k) => (
-              <option key={k}>{bpps[k]}</option>
+            {bpps.map((mode) => (
+              <option key={mode}>{mode}</option>
             ))}
           </select>
         </div>
@@ -488,7 +492,10 @@ const BangleConnect = ({
       (albums, err) => {
         if (err) {
           console.error(err);
-          console.error('could not get albums json data file from bangle');
+          console.error(
+            'could not get albums json data file from bangle',
+            albums
+          );
           return;
         }
 
@@ -702,11 +709,15 @@ const AlbumImage = ({ id, data, name, removed, fileName, removeFromAlbum }) => {
             flex: '1 1 auto',
             height: '176px',
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          loading {name} …
+          <p>loading {name} …</p>
+          <button className="button-full" onClick={onClickRemove}>
+            {removed ? 'Undelete' : 'Delete'}
+          </button>
         </div>
       ) : (
         <Fragment>
@@ -800,7 +811,13 @@ const Main = () => {
 
   // let's select the first available album
   useEffect(() => {
-    if (currentAlbum || !albums || !albums.length) return;
+    if (currentAlbum) {
+      if (!albums || !albums.length) {
+        setCurrentAlbum(null);
+      }
+      return;
+    }
+    if (!albums || !albums.length) return;
     setCurrentAlbum(albums[0].id);
   }, [albums, currentAlbum, setCurrentAlbum]);
 
