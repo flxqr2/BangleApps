@@ -10,7 +10,15 @@ exports.listener = function(type, msg) {
     clearTimeout(exports.messageTimeout);
     delete exports.messageTimeout;
   }
-  if (msg.t==="remove") return;
+  if (msg.t==="remove") {
+    // we won't open the UI for removed messages, so make sure to delete it from flash
+    if (Bangle.MESSAGES) {
+      // we were waiting for exports.messageTimeout
+      require("messages").apply(msg, Bangle.MESSAGES);
+      if (!Bangle.MESSAGES.length) delete Bangle.MESSAGES;
+    }
+    return require("messages").save(msg); // always write removal to flash
+  }
 
   const appSettings = require("Storage").readJSON("messages.settings.json", 1) || {};
   let loadMessages = (Bangle.CLOCK || event.important);
@@ -18,9 +26,25 @@ exports.listener = function(type, msg) {
     if (Bangle.CLOCK && msg.state && msg.title && appSettings.openMusic) loadMessages = true;
     else return;
   }
-  require("messages").save(msg);
+  if (Bangle.load === load || !Bangle.uiRemove) {
+    // no fast loading: store message to flash
+    /* FIXME: Maybe we need a better way of deciding if an app will
+    be fast loaded than just hard-coding a Bangle.uiRemove check.
+    Bangle.load could return a bool (as the load doesn't happen immediately). */
+    require("messages").save(msg);
+  } else {
+    if (!Bangle.MESSAGES) Bangle.MESSAGES = [];
+    require("messages").apply(msg, Bangle.MESSAGES);
+    if (!Bangle.MESSAGES.length) delete Bangle.MESSAGES;
+  }
+  const saveToFlash = () => {
+    // save messages from RAM to flash after all, if we decide not to launch app
+    if (Bangle.MESSAGES) Bangle.MESSAGES.forEach(m => require("messages").save(m));
+    delete Bangle.MESSAGES;
+  }
   msg.handled = true;
   if ((msg.t!=="add" || !msg.new) && (type!=="music")) { // music always has t:"modify"
+    saveToFlash();
     return;
   }
 
@@ -34,8 +58,13 @@ exports.listener = function(type, msg) {
   if (exports.messageTimeout) clearTimeout(exports.messageTimeout);
   exports.messageTimeout = setTimeout(function() {
     delete exports.messageTimeout;
+    if (!Bangle.MESSAGES) return; // message was removed during the delay
     if (type!=="music") {
-      if (!loadMessages) return require("messages").buzz(msg.src); // no opening the app, just buzz
+      if (!loadMessages) {
+        // not opening the app, just buzz
+        saveToFlash();
+        return require("messages").buzz(msg.src);
+      }
       if (!quiet && unlockWatch) {
         Bangle.setLocked(false);
         Bangle.setLCDPower(1); // turn screen on
@@ -51,9 +80,11 @@ exports.listener = function(type, msg) {
  */
 exports.open = function(msg) {
   if (msg && msg.id && !msg.show) {
-    // store which message to load
     msg.show = 1;
-    require("messages").save(msg, {force: 1});
+    if (Bangle.load === load) {
+      // no fast loading: store message to load in flash
+      require("messages").save(msg, {force: 1});
+    }
   }
 
   Bangle.load((msg && msg.new && msg.id!=="music") ? "messagegui.new.js" : "messagegui.app.js");

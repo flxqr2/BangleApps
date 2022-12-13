@@ -48,7 +48,7 @@ var offsets = require("Storage").readJSON("hworldclock.settings.json") || [];
 //=======Sun
 setting = require("Storage").readJSON("setting.json",1);
 E.setTimeZone(setting.timezone); // timezone = 1 for MEZ, = 2 for MESZ
-SunCalc = require("hsuncalc.js");
+SunCalc = require("suncalc"); // from modules folder
 const LOCATION_FILE = "mylocation.json";
 var rise = "read";
 var set	= "...";
@@ -299,20 +299,7 @@ g.clear();
 // Init the settings of the app
 loadMySettings();
 
-// Show launcher when middle button pressed
-Bangle.setUI({
-  mode : "clock",
-  remove : function() {
-    // Called to unload all of the clock app
-    if (PosInterval) clearInterval(PosInterval);
-    PosInterval = undefined;
-    if (drawTimeoutSeconds) clearTimeout(drawTimeoutSeconds);
-    drawTimeoutSeconds = undefined;
-    if (drawTimeout) clearTimeout(drawTimeout);
-    drawTimeout = undefined;	
-  }});
-Bangle.loadWidgets();
-Bangle.drawWidgets();
+
 
 
 // draw immediately at first, queue update
@@ -320,10 +307,11 @@ draw();
 
 
 
-function initDragEvents() {
+
 	
-if (BANGLEJS2) { 	
-	Bangle.on("drag", e => {
+//if (BANGLEJS2) { 	
+	//Bangle.on("drag", e => {
+	let onDrag = e => {	
 		if (!drag) { // start dragging
 			drag = {x: e.x, y: e.y};
 		} else if (!e.b) { // released
@@ -338,13 +326,13 @@ if (BANGLEJS2) {
 				}
 			} else if (Math.abs(dy)>Math.abs(dx)+10) {
 				// vertical
-				if (dx < dy) {
-					g.clear().setRotation(2);
+				if (dx < dy) { //down
+					g.clear().setRotation(0);
 					draw();
 					Bangle.loadWidgets();
 					Bangle.drawWidgets();
 				} else {
-					g.clear().setRotation(0);
+					g.clear().setRotation(2);
 					draw();
 					Bangle.loadWidgets();
 					Bangle.drawWidgets();
@@ -356,16 +344,17 @@ if (BANGLEJS2) {
 				}
 			}
 		}
-	});
-	} else {
+	}; //);
+	Bangle.on("drag", onDrag);
+	//} else {
 			//setWatch(xxx, BTN1, { repeat: true, debounce:50 }); // maybe adding this later
 			//setWatch(xxx, BTN3, { repeat: true, debounce:50 });
 			//setWatch(xxx, BTN4, { repeat: true, debounce:50 });
 			//setWatch(xxx, BTN5, { repeat: true, debounce:50 });
-		}
-}
+	//	}
+//}
 
-initDragEvents();
+
 
 if (!Bangle.isLocked())  { // Initial state
 		if (showSunInfo) {
@@ -403,7 +392,8 @@ if (!Bangle.isLocked())  { // Initial state
   }
  
 
-Bangle.on('lock',on=>{
+//Bangle.on('lock',on=>{
+let onLock = on => {	
   if (!on) { // UNlocked
 		if (showSunInfo) {
 			if (PosInterval != 0) clearInterval(PosInterval);
@@ -439,5 +429,29 @@ Bangle.on('lock',on=>{
 		}
 		draw(); // draw immediately, queue redraw		
   }
- });
+ };
+Bangle.on('lock', onLock);
+
+// Show launcher when middle button pressed
+Bangle.setUI({
+  mode : "custom",clock:true,
+  remove : function() {
+    // Called to unload all of the clock app
+	if (typeof PosInterval === "undefined") {
+		console.log("PosInterval is undefined");
+	} else {
+		if (PosInterval) clearInterval(PosInterval);
+	}	
+    PosInterval = undefined;
+    if (drawTimeoutSeconds) clearTimeout(drawTimeoutSeconds);
+    drawTimeoutSeconds = undefined;
+    if (drawTimeout) clearTimeout(drawTimeout);
+    drawTimeout = undefined;
+	if (BANGLEJS2) Bangle.removeListener("drag",onDrag);
+	Bangle.removeListener("onLock",onLock);
+  }});
+Bangle.loadWidgets();
+Bangle.drawWidgets();
+ 
+// );
 }
