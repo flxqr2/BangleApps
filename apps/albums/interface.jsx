@@ -51,15 +51,24 @@ const uid = () => {
 };
 
 const ViewOnBangleButton = memo(({ data, ...props }) => {
+  const [loading, setLoading] = useState(false);
   const onClick = useCallback(() => {
+    setLoading(true);
     UART.eval('load(null)', () => {});
     UART.eval(
       `g.setColor(0x000000).setBgColor(0xFFFFFF).clear().drawImage(require("heatshrink").decompress(atob("${data}")));`,
-      () => {}
+      () => {
+        setLoading(false);
+      }
     );
-  }, [data]);
+  }, [data, setLoading]);
   return (
-    <button className="button-full" onClick={onClick} {...props}>
+    <button
+      className="button-full"
+      disabled={!!loading}
+      onClick={onClick}
+      {...props}
+    >
       View on Bangle
     </button>
   );
@@ -147,16 +156,17 @@ const DropZone = ({ onAddImage }) => {
         onDragOver={onDragOver}
         onDrop={onDrop}
         style={{
+          display: 'block',
           margin: 0,
           padding: '2rem',
           background: 'rgb(198 243 172)',
-          borderRadius: '1rem',
+          borderRadius: '.2rem',
           textAlign: 'center',
           boxShadow: 'black 0px -3px 4px -4px',
           cursor: 'pointer',
         }}
       >
-        Drop image files <u>here</u> or click to add images
+        Drop image files here or <u>click</u> to add images
         <UploadField onAddImage={onAddImage} />
       </label>
     </div>
@@ -420,6 +430,10 @@ const BangleConnect = ({
   setBangleQueried,
   bangleQueried,
 }) => {
+  const [requestingAlbums, setRequestingAlbums] = useState(false);
+  const [uploadingAlbums, setUploadingAlbums] = useState(false);
+  const [error, setError] = useState(null);
+
   const checksums = useRef({
     current: checksum(JSON.stringify([])),
     original: checksum(JSON.stringify([])),
@@ -487,15 +501,14 @@ const BangleConnect = ({
 
   // read json file from bangle
   const getBangleData = useCallback(() => {
+    setRequestingAlbums(true);
     UART.eval(
       'require("Storage").readJSON("albums.json.data")',
       (albums, err) => {
         if (err) {
           console.error(err);
-          console.error(
-            'could not get albums json data file from bangle',
-            albums
-          );
+          setError('could not get albums json data file from bangle');
+          setRequestingAlbums(false);
           return;
         }
 
@@ -529,10 +542,11 @@ const BangleConnect = ({
             })),
           }))
         );
-        setBangleQueried(true);
 
         UART.eval('require("Storage").getStats()', (data) => {
           setStorageStats(data);
+          setBangleQueried(true);
+          setRequestingAlbums(false);
         });
       }
     );
@@ -542,16 +556,23 @@ const BangleConnect = ({
     setStorageStats,
     setBangleQueried,
     convertToBangleJson,
+    setRequestingAlbums,
+    setError,
   ]);
 
+  useEffect(() => {
+    getBangleData();
+  }, [getBangleData]);
+
   const writeBangleData = useCallback(async () => {
+    setUploadingAlbums(true);
     UART.eval(
       `require("Storage").write("albums.json.data",'${jsonFile}');`,
       (data) => {
         console.log('wrote json data', data);
 
         // if we have data on our image object, we need to store it
-        // otherwise the file should be be sored on bangle already
+        // otherwise the file should be be stored on bangle already
         const js =
           newFiles
             .map(
@@ -568,32 +589,51 @@ const BangleConnect = ({
 
         UART.eval(js, (data) => {
           console.log('done');
+          setUploadingAlbums(false);
           // let's get data from bangle to make sure that everything is in sync
           getBangleData();
         });
       }
     );
-  }, [jsonFile, newFiles, deleteFiles, getBangleData]);
+  }, [jsonFile, newFiles, deleteFiles, getBangleData, setUploadingAlbums]);
 
   return (
     <Fragment>
+      {!!error && <div style={{ backgroundColor: red }}>{error}</div>}
       <div
-        style={{
-          display: 'flex',
-          position: 'sticky',
-          top: 0,
-          zIndex: 3,
-          background: 'white',
-        }}
+        style={
+          !bangleQueried
+            ? {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: '100%',
+                background: 'white',
+              }
+            : {
+                display: 'flex',
+                position: 'sticky',
+                top: 0,
+                zIndex: 3,
+                background: 'white',
+              }
+        }
       >
-        <button className="button-full" onClick={getBangleData}>
+        <button
+          disabled={requestingAlbums || uploadingAlbums}
+          onClick={getBangleData}
+        >
           Get albums from Bangle
         </button>
         {!!bangleQueried && (
           <Fragment>
             <div style={{ flex: '1 1 100%' }} />
             <button
+              className="button-full"
               disabled={
+                requestingAlbums ||
+                uploadingAlbums ||
                 checksums.current.original === checksums.current.current
               }
               style={{ marginLeft: 'auto', display: 'block' }}
@@ -635,10 +675,15 @@ const BangleConnect = ({
         {!!showDebug && !!bangleQueried && (
           <section>
             <h5 style={{ margin: 0 }}>Sync data: </h5>
-            <Code>{JSON.stringify(checksums)}</Code>
-            <Code>{jsonFile}</Code>
-            <Code>{JSON.stringify(newFiles)}</Code>
-            <Code>{JSON.stringify(deleteFiles)}</Code>
+            {checksums.current.current === checksums.current.original ? (
+              <p>Nothing to sync</p>
+            ) : (
+              <Fragment>
+                <Code>{jsonFile}</Code>
+                <Code>{JSON.stringify(newFiles)}</Code>
+                <Code>{JSON.stringify(deleteFiles)}</Code>
+              </Fragment>
+            )}
           </section>
         )}
       </section>
@@ -650,6 +695,14 @@ const AlbumImage = ({ id, data, name, removed, fileName, removeFromAlbum }) => {
   const [loading, setLoading] = useState(true);
   const [bangleData, setBangleData] = useState(null);
   const [url, setUrl] = useState(null);
+  const alive = useRef(true);
+
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [alive]
+  );
 
   // let's load image data from bangle if there is no data from album info (i.e. when displaying a new image frmoo upload field)
   useEffect(() => {
@@ -657,13 +710,16 @@ const AlbumImage = ({ id, data, name, removed, fileName, removeFromAlbum }) => {
     setLoading(true);
     setBangleData(null);
     UART.eval(`require("Storage").read("${fileName}")`, (data, error) => {
+      if (!alive.current) {
+        return;
+      }
       if (!data || error) {
         console.error(error);
         return;
       }
       setBangleData(data);
     });
-  }, [fileName, data, setBangleData, setLoading]);
+  }, [fileName, data, setBangleData, setLoading, alive]);
 
   // let's convert our compressed espruino image to an url resource
   useEffect(() => {
@@ -731,11 +787,15 @@ const AlbumImage = ({ id, data, name, removed, fileName, removeFromAlbum }) => {
           />
           <div style={{ flex: '0 0 4rem' }}>
             {!!(data || bangleData) && (
-              <ViewOnBangleButton data={data || bangleData} />
+              <p>
+                <ViewOnBangleButton data={data || bangleData} />
+              </p>
             )}
-            <button className="button-full" onClick={onClickRemove}>
-              {removed ? 'Undelete' : 'Delete'}
-            </button>
+            <p>
+              <button className="button-full" onClick={onClickRemove}>
+                {removed ? 'Undelete' : 'Delete'}
+              </button>
+            </p>
           </div>
         </Fragment>
       )}
@@ -753,7 +813,7 @@ const Album = ({ setAlbums, removeFromAlbum, id, name, images }) => {
 
   return (
     <section className="container">
-      <label htmlFor="input_name">Name</label>
+      <label htmlFor="input_name">Album Name</label>
       <input
         ref={ref}
         id="input_name"

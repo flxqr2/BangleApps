@@ -8,7 +8,15 @@ Upload the app to bangle, then use the custom interface on Bangle Apps to organi
 
 ## Features
 
-Name the function
+- viewing images
+- organizing albums
+  - sync from bangle
+  - add albums
+  - uploading image files (webm / jpg / png / svg)
+  - set image conversion options
+  - add to album
+  - remove from album
+  - sync to bangle
 
 ## Controls
 
@@ -21,4 +29,4 @@ For requests please send an email to flx@flxlabs.com
 
 ## Creator
 
-Felix Quartu
+Felix Quartu, @flxqr2
