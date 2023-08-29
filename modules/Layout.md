@@ -30,7 +30,7 @@ g.clear();
 layout.render();
 ```
 
-`layoutObject` has:
+`layoutObject` (first argument) has:
 
 - A `type` field of:
   - `undefined` - blank, can be used for padding
@@ -46,13 +46,19 @@ layout.render();
 - A `r` field to set rotation of text or images (0: 0°, 1: 90°, 2: 180°, 3: 270°).
 - A `wrap` field to enable line wrapping. Requires some combination of `width`/`height` and `fillx`/`filly` to be set. Not compatible with text rotation.
 - A `col` field, eg `#f00` for red
-- A `bgCol` field for background color (will automatically fill on render)
+- A `bgCol` field for background color (will automatically fill on render). When `type:"btn"`, this sets the background color of the button, and will not change color on press
+- A `btnBorder` field for button border color (will default to theme if not set)
 - A `halign` field to set horizontal alignment WITHIN a `v` container. `-1`=left, `1`=right, `0`=center
 - A `valign` field to set vertical alignment WITHIN a `h` container. `-1`=top, `1`=bottom, `0`=center
 - A `pad` integer field to set pixels padding
 - A `fillx` int to choose if the object should fill available space in x. 0=no, 1=yes, 2=2x more space
 - A `filly` int to choose if the object should fill available space in y. 0=no, 1=yes, 2=2x more space
-- `width` and `height` fields to optionally specify minimum size options is an object containing:
+- `width` and `height` fields to optionally specify minimum size
+
+
+ `options` (second argument) is an object containing:
+
+
 - `lazy` - a boolean specifying whether to enable automatic lazy rendering
 - `btns` - array of objects containing:
   - `label` - the text on the button

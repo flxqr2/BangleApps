@@ -72,7 +72,7 @@ exports.apply = function(event, messages) {
     messages.splice(mIdx, 1);
   } else if (event.t==="add") {
     if (mIdx>=0) messages.splice(mIdx, 1); // duplicate ID! erase previous version
-    messages.unshift(event);
+    messages.unshift(event); // add at the beginning
   } else if (event.t==="modify") {
     if (mIdx>=0) messages[mIdx] = Object.assign(messages[mIdx], event);
     else messages.unshift(event);
@@ -107,7 +107,7 @@ exports.dismiss = function(msg) {
 };
 
 /**
- * Emit a "type=openGUI" event, to open GUI app
+ * Open the Messages GUI app
  *
  * @param {object} [msg={}] Message the app should show
  */
@@ -215,8 +215,9 @@ exports.buzz = function(msgSrc) {
 
   let repeat = msgSettings.repeat;
   if (repeat===undefined) repeat = 4; // repeat may be zero
-  if (repeat) {
-    exports.buzzTimeout = setTimeout(() => require("buzz").pattern(pattern), repeat*1000);
+  if (repeat)
+  {
+    exports.buzzInterval = setInterval(() => require("buzz").pattern(pattern), repeat*1000);
     let vibrateTimeout = msgSettings.vibrateTimeout;
     if (vibrateTimeout===undefined) vibrateTimeout = 60;
     if (vibrateTimeout && !exports.stopTimeout) exports.stopTimeout = setTimeout(exports.stopBuzz, vibrateTimeout*1000);
@@ -227,8 +228,8 @@ exports.buzz = function(msgSrc) {
  * Stop buzzing
  */
 exports.stopBuzz = function() {
-  if (exports.buzzTimeout) clearTimeout(exports.buzzTimeout);
-  delete exports.buzzTimeout;
+  if (exports.buzzInterval) clearInterval(exports.buzzInterval);
+  delete exports.buzzInterval;
   if (exports.stopTimeout) clearTimeout(exports.stopTimeout);
   delete exports.stopTimeout;
 };

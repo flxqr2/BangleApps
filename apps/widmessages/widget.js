@@ -11,7 +11,7 @@
   // the name still needs to be "messages": the library calls WIDGETS["messages'].hide()/show()
   // see e.g. widmsggrid
   WIDGETS["messages"] = {
-    area: "tl", width: 0, srcs: [], draw: function(recall) {
+    area: "tl", width: 0, srcs: [], draw: function(_w, recall) {
       // If we had a setTimeout queued from the last time we were called, remove it
       if (WIDGETS["messages"].i) {
         clearTimeout(WIDGETS["messages"].i);
@@ -22,10 +22,9 @@
       let settings = Object.assign({flash: true, maxMessages: 3}, require("Storage").readJSON("messages.settings.json", true) || {});
       if (recall!==true || settings.flash) {
         const msgsShown = E.clip(this.srcs.length, 0, settings.maxMessages);
-          srcs = Object.keys(this.srcs);
         g.reset().clearRect(this.x, this.y, this.x+this.width, this.y+23);
         for(let i = 0; i<msgsShown; i++) {
-          const src = srcs[i];
+          const src = this.srcs[i];
           const colors = [
             g.theme.bg,
             require("messageicons").getColor(src, {settings: settings})
@@ -43,7 +42,7 @@
             this.x+12+i*24, this.y+12, {rotate: 0/*force centering*/});
         }
       }
-      WIDGETS["messages"].i = setTimeout(() => WIDGETS["messages"].draw(true), 1000);
+      WIDGETS["messages"].i = setTimeout(() => WIDGETS["messages"].draw(WIDGETS["messages"], true), 1000);
       if (process.env.HWVERSION>1) Bangle.on("touch", this.touch);
     }, onMsg: function(type, msg) {
       if (this.hidden) return;
@@ -72,6 +71,6 @@
     }
   };
 
-  Bangle.on("message", WIDGETS["messages"].onMsg);
+  Bangle.on("message", WIDGETS["messages"].onMsg.bind(WIDGETS["messages"]));
   WIDGETS["messages"].onMsg("init", {}); // abuse type="init" to prevent Bangle.drawWidgets();
 })();
