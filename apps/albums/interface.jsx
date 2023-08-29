@@ -423,7 +423,39 @@ const ListEntry = ({ file, onAddToAlbum, removeImage }) => {
   );
 };
 
-const showDebug = false;
+const showDebug = true;
+
+const BangleCleanup = ({ onEnd }) => {
+  const [error, setError] = useState(null);
+
+  const onClick = useCallback(() => {
+    if (!confirm('Really?')) return;
+    UART.eval(
+      'require("Storage").list(/albums.*json/).forEach(f=>require("Storage").erase(f));require("Storage").compact();',
+      (data, err) => {
+        if (err) {
+          setError(err);
+        }
+        onEnd();
+      }
+    );
+  }, [setError]);
+
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => {
+      setError(null);
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [error, setError]);
+
+  return (
+    <div>
+      <button onClick={onClick}>Erase all album data</button>
+    </div>
+  );
+};
+
 const BangleConnect = ({
   albums,
   setAlbums,
@@ -433,6 +465,14 @@ const BangleConnect = ({
   const [requestingAlbums, setRequestingAlbums] = useState(false);
   const [uploadingAlbums, setUploadingAlbums] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => {
+      setError(null);
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [error, setError]);
 
   const checksums = useRef({
     current: checksum(JSON.stringify([])),
@@ -503,7 +543,7 @@ const BangleConnect = ({
   const getBangleData = useCallback(() => {
     setRequestingAlbums(true);
     UART.eval(
-      'require("Storage").readJSON("albums.json.data")',
+      'require("Storage").readJSON("albums.json.data", true)',
       (albums, err) => {
         if (err) {
           console.error(err);
@@ -512,24 +552,26 @@ const BangleConnect = ({
           return;
         }
 
-        const _albums = albums
-          .map((album) => {
-            return !album || !album.images || !album.images.length
-              ? null
-              : {
-                  ...album,
-                  images: album.images
-                    .map((image) =>
-                      !image
-                        ? null
-                        : {
-                            ...image,
-                          }
-                    )
-                    .filter((i) => !!i),
-                };
-          })
-          .filter((a) => !!a);
+        const _albums =
+          albums ||
+          []
+            .map((album) => {
+              return !album || !album.images || !album.images.length
+                ? null
+                : {
+                    ...album,
+                    images: album.images
+                      .map((image) =>
+                        !image
+                          ? null
+                          : {
+                              ...image,
+                            }
+                      )
+                      .filter((i) => !!i),
+                  };
+            })
+            .filter((a) => !!a);
 
         checksums.current.original = checksum(JSON.stringify(_albums));
 
@@ -569,37 +611,41 @@ const BangleConnect = ({
     UART.eval(
       `require("Storage").write("albums.json.data",'${jsonFile}');`,
       (data) => {
-        console.log('wrote json data', data);
-
-        // if we have data on our image object, we need to store it
-        // otherwise the file should be be stored on bangle already
-        const js =
-          newFiles
-            .map(
-              ({ name, data }) =>
-                !!data && `require('Storage').write('${name}', '${data}')`
-            )
-            .join(';') +
-          deleteFiles
-            .map(
-              ({ fileName }) =>
-                !!fileName && `require('Storage').erase('${fileName}')`
-            )
-            .join(';');
-
-        UART.eval(js, (data) => {
-          console.log('done');
-          setUploadingAlbums(false);
-          // let's get data from bangle to make sure that everything is in sync
-          getBangleData();
-        });
+        console.log('wrote json data');
       }
     );
+    // if we have data on our image object, we need to store it
+    // otherwise the file should be be stored on bangle already
+    newFiles.forEach(
+      ({ name, data }) =>
+        !!data &&
+        UART.eval(
+          `require('Storage').write('${name}', '${data}')`,
+          (data, error) => {
+            console.log(`wrote ${name}`);
+          }
+        )
+    );
+
+    deleteFiles.forEach(
+      ({ fileName }) =>
+        !!fileName &&
+        UART.eval(`require('Storage').erase('${fileName}')`, (data, error) => {
+          console.log(`wrote ${fileName}`);
+        })
+    );
+
+    UART.eval(`console.log('done')`, (data) => {
+      console.log('done');
+      setUploadingAlbums(false);
+      // let's get data from bangle to make sure that everything is in sync
+      getBangleData();
+    });
   }, [jsonFile, newFiles, deleteFiles, getBangleData, setUploadingAlbums]);
 
   return (
     <Fragment>
-      {!!error && <div style={{ backgroundColor: red }}>{error}</div>}
+      {!!error && <div style={{ backgroundColor: 'red' }}>{error}</div>}
       <div
         style={
           !bangleQueried
@@ -629,6 +675,7 @@ const BangleConnect = ({
         {!!bangleQueried && (
           <Fragment>
             <div style={{ flex: '1 1 100%' }} />
+            <BangleCleanup onEnd={getBangleData} />
             <button
               className="button-full"
               disabled={
@@ -929,7 +976,7 @@ const Main = () => {
                   .map((img) =>
                     img.id === id
                       ? img.data
-                        ? null //  if not yet stored on bangle, remoove immediately
+                        ? null //  if not yet stored on bangle, remove immediately
                         : { ...img, removed: !img.removed } // set removed flag to delete file on bangle
                       : { ...img }
                   )
@@ -984,6 +1031,10 @@ const Main = () => {
                   padding: '.2rem 0',
                 }}
               >
+                {!albums ||
+                  (!albums.length && (
+                    <div>You don't have any albums yet, please create one</div>
+                  ))}
                 {albums.map(({ id, name }) => (
                   <AlbumButton
                     key={id}
@@ -1016,7 +1067,7 @@ const Main = () => {
             />
           )}
 
-          {(1 || !!currentAlbum) && (
+          {!!currentAlbum && (
             <div className="container">
               <section title="Picture for album">
                 {images.map((file) => (
@@ -1030,8 +1081,7 @@ const Main = () => {
               </section>
             </div>
           )}
-
-          <DropZone onAddImage={addImage} />
+          {!!currentAlbum && <DropZone onAddImage={addImage} />}
         </div>
       )}
     </main>
