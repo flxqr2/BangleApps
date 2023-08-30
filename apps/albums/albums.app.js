@@ -4,11 +4,7 @@ function getImage(idx) {
   }
   const i = (idx + images.length) % images.length;
   return require('heatshrink').decompress(
-    atob(
-      require('Storage').read(
-        'albums.data.' + albums[currAlbum].id + '.' + images[i].id
-      )
-    )
+    atob(require('Storage').read('albums.data.' + albums[currAlbum].id + '.' + images[i].id))
   );
 }
 
@@ -18,13 +14,7 @@ function drawImg(idx, x, y) {
 
 function changeAlbum(idx, dir) {
   currAlbum =
-    albums &&
-    albums.length &&
-    albums.length > currAlbum &&
-    albums[idx].images &&
-    albums[idx].images.length
-      ? idx
-      : 0;
+    albums && albums.length && albums.length > currAlbum && albums[idx].images && albums[idx].images.length ? idx : 0;
   scrollOff(0, dir);
   images = albums[idx].images;
   currAlbum = idx;
